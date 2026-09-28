@@ -10,23 +10,28 @@
  */
 
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Mascot } from '@/components/Mascot';
+import { Celebration } from '@/components/Celebration';
+import { MascotStage } from '@/components/Mascot';
 import { Body, Button, Caption, Card, Notice, Screen, Spacer, Title } from '@/components/ui';
 import { addDays, formatDayLabel, todayLocal } from '@/domain/date';
 import { formatVolume } from '@/domain/hydration';
 import { useAppState } from '@/state/AppProvider';
 import { useOnboarding } from '@/state/OnboardingProvider';
 import { color, spacing } from '@/theme';
+import { play } from '@/services/sound';
 import { haptic } from '@/utils/haptics';
 
 export default function GoalConfirmScreen() {
-  const { startGoal, updateSettings, reduceMotion } = useAppState();
+  const { startGoal, updateSettings, reduceMotion, activeGoal, goalDay } = useAppState();
   const { dailyGoalMl, durationDays, notificationsEnabled, reset } = useOnboarding();
   const [fill, setFill] = useState(0);
+  const [burst, setBurst] = useState(false);
   const [busy, setBusy] = useState(false);
+  // A ref, not state: a double tap must not start two goals.
+  const startingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   const start = todayLocal();
@@ -39,19 +44,34 @@ export default function GoalConfirmScreen() {
       return;
     }
     const timer = setTimeout(() => setFill(1), 260);
-    return () => clearTimeout(timer);
+    const burstTimer = setTimeout(() => {
+      setBurst(true);
+      haptic('light');
+      play('twinkle');
+    }, 1100);
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(burstTimer);
+    };
   }, [reduceMotion]);
 
   const handleStart = async () => {
+    if (startingRef.current) return;
+    startingRef.current = true;
     setBusy(true);
     setError(null);
     try {
-      await startGoal({ dailyGoalMl, durationDays });
+      // Settings first: startGoal rebuilds the reminder plan from stored
+      // settings, so the preference must already be saved when it runs.
       await updateSettings({ notificationsEnabled, onboardingCompleted: true });
+      await startGoal({ dailyGoalMl, durationDays });
       haptic('success');
       reset();
-      router.replace('/(tabs)');
+      // Back to the tabs already underneath (a new goal from inside the app),
+      // or onto them for the first time — never a second copy of them.
+      router.dismissTo('/(tabs)');
     } catch (cause) {
+      startingRef.current = false;
       setBusy(false);
       setError(cause instanceof Error ? cause.message : 'Could not save your goal. Try again?');
     }
@@ -60,7 +80,12 @@ export default function GoalConfirmScreen() {
   return (
     <Screen scroll contentStyle={styles.content}>
       <View style={styles.hero}>
-        <Mascot state="celebrating" size={196} reduceMotion={reduceMotion} fill={fill} />
+        <MascotStage
+          state={fill >= 1 ? 'celebrating' : 'happy'}
+          size={196}
+          reduceMotion={reduceMotion}
+          fill={fill}
+        />
       </View>
 
       <Spacer size={spacing.xl} />
@@ -73,7 +98,7 @@ export default function GoalConfirmScreen() {
 
       <Spacer size={spacing.xl} />
 
-      <Card>
+      <Card glow>
         <Row label="Daily target" value={formatVolume(dailyGoalMl)} />
         <Divider />
         <Row label="Goal length" value={`${durationDays} days`} />
@@ -84,6 +109,7 @@ export default function GoalConfirmScreen() {
         <Divider />
         <Row label="Reminders" value={notificationsEnabled ? 'On' : 'Off'} />
       </Card>
+      <Celebration active={burst} reduceMotion={reduceMotion} />
 
       {error ? (
         <>
@@ -92,12 +118,21 @@ export default function GoalConfirmScreen() {
         </>
       ) : null}
 
+      {activeGoal ? (
+        <>
+          <Spacer size={spacing.md} />
+          <Notice
+            tone="secondary"
+            text={`This replaces your current goal (day ${goalDay} of ${activeGoal.durationDays}). Today’s drinks count toward the new target; earlier days keep theirs.`}
+          />
+        </>
+      ) : null}
+
       <Spacer size={spacing.xl} />
-      <Button label={busy ? 'Starting…' : 'Start my goal'} disabled={busy} onPress={handleStart} />
+      <Button label={busy ? 'Starting…' : 'Start my goal'} disabled={busy} onPress={() => void handleStart()} />
       <Spacer size={spacing.md} />
       <Caption tone="muted" center>
-        Changing your goal later starts a new period. Days you have already logged keep their
-        original target.
+        Changing your goal later starts a new period. Earlier days keep the target they had.
       </Caption>
     </Screen>
   );
@@ -137,8 +172,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   divider: {
-    height: 1,
-    backgroundColor: color.border,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: color.borderStrong,
     marginVertical: spacing.md,
   },
 });

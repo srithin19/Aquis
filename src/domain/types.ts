@@ -69,6 +69,8 @@ export interface AppSettings {
   quietEnd: string;
   reduceMotion: boolean;
   hapticsEnabled: boolean;
+  /** In-app sound effects and the notification sound. */
+  soundsEnabled: boolean;
   /** Quick-add buttons on Home (06.9). Stored as an ordered ml list. */
   quickAddMl: number[];
   postGoalRemindersEnabled: boolean;

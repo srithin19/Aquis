@@ -21,6 +21,8 @@ interface OnboardingValue extends OnboardingDraft {
   setDailyGoalMl(ml: number): void;
   setDurationDays(days: number): void;
   setNotificationsEnabled(enabled: boolean): void;
+  /** Start the draft from what the user already has (new goal from inside the app). */
+  seed(draft: OnboardingDraft): void;
   reset(): void;
 }
 
@@ -42,6 +44,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       setDurationDays: (durationDays) => setDraft((current) => ({ ...current, durationDays })),
       setNotificationsEnabled: (notificationsEnabled) =>
         setDraft((current) => ({ ...current, notificationsEnabled })),
+      seed: (next) => setDraft(next),
       reset: () => setDraft(DEFAULT_DRAFT),
     }),
     [draft],

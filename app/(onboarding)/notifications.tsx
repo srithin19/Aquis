@@ -19,7 +19,8 @@ import { Mascot } from '@/components/Mascot';
 import { Body, BodyStrong, Button, Caption, Card, Screen, Spacer, Title } from '@/components/ui';
 import { useAppState } from '@/state/AppProvider';
 import { useOnboarding } from '@/state/OnboardingProvider';
-import { color, spacing } from '@/theme';
+import { requestPermission } from '@/services/notificationService';
+import { palette, spacing } from '@/theme';
 
 const PROMISES = [
   'Reminders arrive around a 3-hour rhythm, at a moment picked inside that window — never on the hour, every hour.',
@@ -33,15 +34,22 @@ export default function NotificationSetupScreen() {
   const { notificationsEnabled, setNotificationsEnabled } = useOnboarding();
   const [busy, setBusy] = useState(false);
 
-  const handleContinue = () => {
+  // 06.6 — the OS prompt appears only now, after the value has been explained,
+  // and only if the user chose reminders.
+  const handleContinue = async () => {
     setBusy(true);
+    if (notificationsEnabled) {
+      const permission = await requestPermission();
+      if (permission === 'denied') setNotificationsEnabled(false);
+    }
+    setBusy(false);
     router.push('/(onboarding)/mascot');
   };
 
   return (
     <Screen scroll contentStyle={styles.content}>
       <View style={styles.header}>
-        <Mascot state="idle" size={92} reduceMotion={reduceMotion} />
+        <Mascot state={notificationsEnabled ? 'happy' : 'sleepy'} size={92} reduceMotion={reduceMotion} />
         <Spacer size={spacing.lg} />
         <Title center>Considerate reminders</Title>
         <Spacer size={spacing.sm} />
@@ -73,14 +81,15 @@ export default function NotificationSetupScreen() {
         <Switch
           value={notificationsEnabled}
           onValueChange={setNotificationsEnabled}
-          trackColor={{ true: color.accent, false: color.border }}
-          thumbColor={color.surface}
+          trackColor={{ true: palette.teal500, false: 'rgba(255,255,255,0.12)' }}
+          thumbColor={palette.text50}
+          ios_backgroundColor="rgba(255,255,255,0.12)"
           accessibilityLabel="Enable hydration reminders"
         />
       </Card>
 
       <Spacer size={spacing.xl} />
-      <Button label="Continue" disabled={busy} onPress={handleContinue} />
+      <Button label={busy ? 'One moment…' : 'Continue'} disabled={busy} onPress={() => void handleContinue()} />
       <Spacer size={spacing.md} />
       <Caption tone="muted" center>
         AQUIS works fully without reminders — the glass and your history do not depend on them.
@@ -108,7 +117,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: color.accent,
+    backgroundColor: palette.teal400,
     marginTop: 8,
     marginRight: spacing.md,
   },

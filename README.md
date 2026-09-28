@@ -4,15 +4,19 @@ A mascot-driven hydration companion. Expo + React Native + TypeScript, local-fir
 
 > Set a goal → receive a considerate reminder → log water → watch the droplet fill → see the mascot react.
 
-This repository implements **Phases 1–2** of the Product Bible development plan (section 20):
-foundation and core hydration. Phases 3–5 are not built yet — see [Not built yet](#not-built-yet).
+All five phases of the Product Bible development plan (section 20) are implemented: foundation,
+core hydration, the notification engine, history & motivation, and the polish pass. The look is a
+Matiks-style dark theme — flat charcoal grounds, neon lime actions, lavender / teal / yellow 3D tiles.
 
 ## Running it
 
 ```bash
-npm install
+npm install        # .npmrc sets legacy-peer-deps; a react-dom peer conflict inside expo-router otherwise fails the install
 npm start          # then scan the QR code with Expo Go
 ```
+
+Everything runs in **Expo Go** — Skia, gradients, blur, fonts and *local* notifications are all
+supported there. No development build is needed.
 
 **The first bundle takes 45–60 seconds.** Expo Go will show *"Failed to download remote update"* if
 you scan the QR before Metro has finished that cold build — it is a timeout, not a failure. Wait for
@@ -24,8 +28,10 @@ Other scripts:
 | Command | What it does |
 | --- | --- |
 | `npm run android` / `npm run ios` | Start with a platform preselected |
+| `npm test` | 66 Jest tests: every screen and button, end-to-end data flows on a real SQLite (sql.js), sounds, and one regression test per audited bug |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run check:domain` | Runs the domain-logic checks (hydration maths, goal periods, local dates) |
+| `npm run sounds` | Re-synthesise the sound effects in `assets/sounds/` |
+| `npm run check:domain` | 39 domain checks: hydration maths, goal periods, local dates, streaks, badges, reminder planning, calendar grid |
 
 ### If Expo Go will not connect
 
@@ -44,30 +50,83 @@ Other scripts:
 
 ## What is implemented
 
-**Phase 1 — Foundation**
+**Look & motion**
 
-- Expo TypeScript project with Expo Router file-based navigation.
-- Design tokens in [`src/theme/tokens.ts`](src/theme/tokens.ts) — palette, spacing, type scale and the
-  motion budget from section 08 (150–500 ms micro-interactions, 1–2 s celebrations).
-- SQLite database with versioned, append-only migrations ([`src/db/`](src/db/)) covering every entity
-  in section 13. Tables for Phase 3/4 (notification events, streaks, achievements) are created now so
-  later phases need no migration against live data.
-- Repository layer ([`src/repositories/`](src/repositories/)) — screens never touch SQL.
-- Onboarding and auth shell. `authService` is an interface with a local adapter; Google and email
-  screens exist and create a real profile record, so swapping in a provider is one line.
-- Mascot prototype as SVG + Reanimated. The droplet doubles as the progress gauge: it holds the
-  day's water rather than standing next to a separate glass.
+- Matiks-style dark palette ([`src/theme/tokens.ts`](src/theme/tokens.ts)), sampled from Matiks'
+  own screenshots: `#141414` grounds, `#1C1C1C` cards, neon lime `#B2F966`, lavender `#B3A3FB`,
+  pastel pink/yellow, teal water. Chunky 3D buttons and tiles that press into their edge.
+- A dark React Navigation theme, so no screen, modal or transition can fall back to light grey.
+- One easing curve (`ease.out`, no overshoot) and short durations everywhere: screens crossfade in
+  180 ms, sheets in 260 ms, tabs in 140 ms.
+- The mascot ([`Mascot`](src/components/Mascot.tsx)) is a character, rendered in **Skia** on the UI
+  thread. Ten feelings — idle, happy, drink, thinking, thirsty, excited, celebrating, proud, sleepy,
+  sad — are each a *pose* (eyes, mouth, brows, cheeks, effects) that the face morphs between
+  smoothly, plus body language per feeling: happy hops, excited bounces, celebrating leaps with a
+  spin, thirsty shivers, sad sulks, sleepy dozes. Effects: tears, sweat, drifting z's, twinkling
+  stars, floating hearts, thought dots, a lime glow. It blinks and giggles when tapped. No limbs — it stays a pure droplet.
+  The liquid inside is two sine waves under a gradient with rising bubbles and a slosh on every
+  change; the face is drawn twice and clipped at the waterline so it reads at every level.
+- Home: the mascot talks in a speech bubble (tap it for another line), reacts to every drink from
+  any source (gulp → grin), shouts out 25/50/75%, and throws a party at 100% — confetti, a burst,
+  a GOAL COMPLETE banner, a flare on the halo — before settling into calm pride. "Last sip 12 min
+  ago", a streak chip that pops when it grows, and "New day, fresh glass" at midnight.
+- Home: sweep-gradient progress halo ([`ProgressRing`](src/components/ProgressRing.tsx)), a ripple and
+  a floating “+250 ml” on each log, count-up numbers, spring-loaded gradient quick-add tiles, and
+  timeline rows that animate in, out and re-flow (Reanimated 4 layout animations).
+- Floating tab bar with a gliding lime indicator.
+- Badge-reveal sheet: backdrop fade → sheet glide → one glow bloom → badge settles → copy rises.
+  Badge checks run one at a time, so a badge can never be celebrated twice.
+- Reduce Motion (OS setting or in-app toggle) turns waves, loops and large movement into instant
+  state changes everywhere.
 
-**Phase 2 — Core hydration**
+**Phase 1–2 — Foundation & core hydration**
 
-- Goal creation with duration; one active goal at a time, enforced in a transaction.
-- Water entry persistence with timestamps and source.
-- Home droplet driven directly from the stored daily total.
-- Quick-add (150/250/500 ml, configurable) and custom amount with validation.
-- A minus button on every logged entry, not just the most recent: each row in today's log subtracts
-  that amount and the day recomputes from what remains.
-- Goal completion: celebration, a "reminders are off for today" state, and extra logging that does
-  not move the target.
+- SQLite with versioned, append-only migrations; repositories are the only layer that writes SQL.
+- Onboarding + auth shell, goal + duration, one active goal enforced in a transaction.
+- Quick-add (configurable) and custom amounts; a minus on every entry; derived daily totals.
+
+**Phase 3 — Notification engine** ([`domain/notifications.ts`](src/domain/notifications.ts),
+[`services/notificationService.ts`](src/services/notificationService.ts))
+
+- OS permission requested only on the reminders screen, after the explanation (06.6).
+- Randomized opportunity windows 2.5–3.25 h after the last drink (first one of the day 45–90 min
+  after waking); never within 90 min of a drink.
+- Suppression: goal complete (unless post-goal reminders are on), quiet hours (editable in Profile,
+  may wrap midnight), daily cap of 6, and silence while AQUIS itself is open.
+- The whole plan is rebuilt on every log, removal, settings change and foreground, and only future
+  times are ever scheduled — so there is never a backlog or a burst after suppression.
+- Each reminder says where the day stands — e.g. *“1.2 L of 2.5 L (48%) · 1.3 L to go”* — and on
+  iOS carries a picture of the mascot droplet filled to that level, drawn offscreen with Skia
+  ([`notificationArt.ts`](src/services/notificationArt.ts)). Android shows the text (expo-notifications
+  has no image support there).
+- Tapping a reminder opens Home; its **Log 250 ml** action logs straight from the notification.
+- Every planned reminder is recorded in `notification_event` (scheduled / shown / opened / logged).
+
+**Phase 4 — History & motivation**
+
+- Month calendar of droplets that fill to each day's frozen completion on first render; month
+  selector; weekly and monthly summary; last-7-days bar chart.
+- Day detail sheet: goal that applied that day, totals, sequential entry timeline.
+- Streaks (current / longest, from daily records only) with milestone celebrations.
+- Achievement engine for the seven badges in section 12, with live progress and a badge-reveal sheet.
+- Goal-end flow: when a period elapses it is frozen as `completed` (every day at 100%) or `ended`,
+  and a one-time summary screen shows the result — celebrating or gently sad, never scolding.
+
+**Sound**
+
+- Original, synthesised effects ([`scripts/make-sounds.py`](scripts/make-sounds.py)): a water bloop
+  on logging, an undo blip, a pop when the mascot is tapped, a chime at 25/50/75%, a twinkle for
+  badges, a celebration at 100%, a swish for sheets. They follow the silent switch, mix with the
+  user's music, and can be switched off in Profile → Sounds.
+- Reminders play a sound when Sounds is on: the system sound in Expo Go, the AQUIS drop
+  (`aquis_drop.wav`, bundled by the expo-notifications plugin) in a real build. On Android a silent
+  channel is used when Sounds is off.
+
+**Phase 5 — Polish**
+
+- Haptics (light on logging, success on milestones), empty/blocked/no-goal states, midnight
+  rollover while the app stays open, and a local-only analytics event taxonomy (section 14) that
+  never leaves the device.
 
 ## Screens
 
@@ -83,8 +142,10 @@ Other scripts:
 | [`app/(onboarding)/confirm.tsx`](app/(onboarding)/confirm.tsx) | 06.8 Goal confirmation |
 | [`app/(tabs)/index.tsx`](app/(tabs)/index.tsx) | 06.9 Home, 06.11 Daily complete |
 | [`app/custom-amount.tsx`](app/custom-amount.tsx) | 06.10 Custom water entry |
-| [`app/(tabs)/history.tsx`](app/(tabs)/history.tsx) | 06.12 / 06.13 — partial, see below |
-| [`app/(tabs)/achievements.tsx`](app/(tabs)/achievements.tsx) | 06.14 — partial, see below |
+| [`app/(tabs)/history.tsx`](app/(tabs)/history.tsx) | 06.12 History calendar |
+| [`app/day/[date].tsx`](app/day/[date].tsx) | 06.13 Day detail |
+| [`app/(tabs)/achievements.tsx`](app/(tabs)/achievements.tsx) | 06.14 Achievements |
+| [`app/goal-summary.tsx`](app/goal-summary.tsx) | 04 Goal completion summary |
 | [`app/(tabs)/profile.tsx`](app/(tabs)/profile.tsx) | 06.15 Profile / Settings |
 
 ## Two rules the code is built around
@@ -105,15 +166,15 @@ Local dates are handled explicitly as `YYYY-MM-DD` keys built from local calenda
 `toISOString()` is deliberately never used for a day key, so a drink at 23:30 does not move
 to tomorrow. `npm run check:domain` covers this along with DST and month boundaries.
 
-## Not built yet
+## Known limits
 
-| Phase | Scope |
+| Area | Note |
 | --- | --- |
-| **3 — Notification engine** | Permission flow, eligibility pipeline, randomized 3-hour opportunity windows, suppression rules, daily caps, rescheduling after logs, deep-link to Home. The onboarding screen records the preference in `AppSettings`; the OS permission is intentionally *not* requested yet, since section 17 says to ask only for permissions the app actually needs. |
-| **4 — History & motivation** | The month calendar of completion droplets, day detail with entry timeline, streak calculation, achievement engine, celebration animations. History currently lists the last 14 logged days; Achievements lists the badge catalogue with nothing marked earned. |
-| **5 — Polish** | Rive mascot state machine (the current mascot is the SVG prototype), physics-style water animation, full empty/error state pass, performance and battery review. |
-
-Reduce Motion and haptics are already wired through both the OS preference and in-app toggles.
+| Active-call / >1 h screen-use suppression | Not exposed to Expo apps. Per the spec's platform-limitation note, these fall back to time-based rules; the one live signal used is "AQUIS is open right now". |
+| Auth | "Continue with Google" and email create a **local** profile — no Google account is contacted and no email is verified. Real Google sign-in needs OAuth client IDs from Google Cloud and a development build (Expo Go can't host it); `authService` is the one place to plug it in. |
+| Custom notification sound | Needs a real build; Expo Go plays the system sound instead. |
+| Mascot | Skia rather than Rive: Rive needs a development build, and this runs in Expo Go. The state vocabulary is identical, so a Rive swap is a component-level change. |
+| Social (V2) | Friends and challenges are out of MVP scope and are only teased on Achievements. |
 
 ## Architecture
 
@@ -122,11 +183,12 @@ app/                    Expo Router routes
   (onboarding)/         06.2 – 06.8
   (tabs)/               Home · History · Achievements · Profile
 src/
-  components/           Mascot (doubles as the gauge), Icon, CountUp, Celebration, ui primitives
+  components/           Mascot (Skia gauge), ProgressRing, MiniDroplet, Badge,
+                        MomentSheet, Celebration, CountUp, Icon, ui primitives
   db/                   SQLite client + migrations
-  domain/               Types and pure logic (hydration, goals, dates, mascot states)
+  domain/               Pure logic: hydration, goals, dates, streaks, achievements, reminder planning
   repositories/         Data access — the only layer that writes SQL
-  services/             authService (provider interface + local adapter)
+  services/             authService, notificationService (expo-notifications adapter), analytics
   state/                AppProvider, OnboardingProvider
   theme/                Design tokens
   utils/                haptics, reduce-motion, ids

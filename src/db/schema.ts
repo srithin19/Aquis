@@ -82,7 +82,6 @@ export const MIGRATIONS: readonly Migration[] = [
          onboarding_completed        INTEGER NOT NULL DEFAULT 0
        );`,
 
-      // Reserved for Phase 3 (notification engine).
       `CREATE TABLE IF NOT EXISTS notification_event (
          id            TEXT PRIMARY KEY NOT NULL,
          scheduled_at  INTEGER NOT NULL,
@@ -92,7 +91,6 @@ export const MIGRATIONS: readonly Migration[] = [
          reason        TEXT
        );`,
 
-      // Reserved for Phase 4 (history & motivation).
       `CREATE TABLE IF NOT EXISTS streak_state (
          id                    INTEGER PRIMARY KEY CHECK (id = 1),
          current               INTEGER NOT NULL DEFAULT 0,
@@ -104,6 +102,28 @@ export const MIGRATIONS: readonly Migration[] = [
          earned_at       INTEGER NOT NULL
        );`,
     ],
+  },
+  {
+    // Goal-end flow (04): a closed goal period shows its summary exactly once.
+    // Existing closed goals are marked seen so upgrading never replays old ones.
+    id: 2,
+    statements: [
+      `ALTER TABLE goal ADD COLUMN summary_seen INTEGER NOT NULL DEFAULT 0;`,
+      `UPDATE goal SET summary_seen = 1 WHERE status != 'active';`,
+      // Before this version every elapsed period was stored as 'completed'.
+      // Only a period where every day hit 100% earns that status (and the Goal
+      // Crusher badge); the rest were periods that simply ended.
+      `UPDATE goal SET status = 'ended'
+         WHERE status = 'completed'
+           AND (SELECT COUNT(*) FROM daily_hydration d
+                 WHERE d.goal_id = goal.id AND d.completed = 1) < goal.duration_days;`,
+      `CREATE INDEX IF NOT EXISTS idx_notification_event_date ON notification_event (related_date, scheduled_at);`,
+    ],
+  },
+  {
+    // Sound effects on by default; users can switch them off in Profile.
+    id: 3,
+    statements: [`ALTER TABLE app_settings ADD COLUMN sounds_enabled INTEGER NOT NULL DEFAULT 1;`],
   },
 ];
 

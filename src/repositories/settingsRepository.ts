@@ -8,6 +8,7 @@ interface SettingsRow {
   quiet_end: string;
   reduce_motion: number;
   haptics_enabled: number;
+  sounds_enabled: number;
   quick_add_ml: string;
   post_goal_reminders_enabled: number;
   onboarding_completed: number;
@@ -19,6 +20,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   quietEnd: '07:00',
   reduceMotion: false,
   hapticsEnabled: true,
+  soundsEnabled: true,
   quickAddMl: [...DEFAULT_QUICK_ADD_ML],
   postGoalRemindersEnabled: false,
   onboardingCompleted: false,
@@ -39,6 +41,7 @@ function toSettings(row: SettingsRow): AppSettings {
     quietEnd: row.quiet_end,
     reduceMotion: row.reduce_motion === 1,
     hapticsEnabled: row.haptics_enabled === 1,
+    soundsEnabled: row.sounds_enabled !== 0,
     quickAddMl: parseQuickAdd(row.quick_add_ml),
     postGoalRemindersEnabled: row.post_goal_reminders_enabled === 1,
     onboardingCompleted: row.onboarding_completed === 1,
@@ -72,6 +75,7 @@ export async function updateSettings(patch: Partial<AppSettings>): Promise<AppSe
   if (patch.quietEnd !== undefined) set('quiet_end', patch.quietEnd);
   if (patch.reduceMotion !== undefined) set('reduce_motion', patch.reduceMotion ? 1 : 0);
   if (patch.hapticsEnabled !== undefined) set('haptics_enabled', patch.hapticsEnabled ? 1 : 0);
+  if (patch.soundsEnabled !== undefined) set('sounds_enabled', patch.soundsEnabled ? 1 : 0);
   if (patch.quickAddMl !== undefined) set('quick_add_ml', patch.quickAddMl.join(','));
   if (patch.postGoalRemindersEnabled !== undefined) {
     set('post_goal_reminders_enabled', patch.postGoalRemindersEnabled ? 1 : 0);

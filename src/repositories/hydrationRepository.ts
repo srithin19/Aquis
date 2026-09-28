@@ -274,3 +274,42 @@ export async function countTotalEntries(): Promise<number> {
   );
   return row?.count ?? 0;
 }
+
+export interface LifetimeTotals {
+  totalEntries: number;
+  totalMl: number;
+  successfulDays: number;
+}
+
+export async function getLifetimeTotals(): Promise<LifetimeTotals> {
+  const db = await getDatabase();
+  const entries = await db.getFirstAsync<{ count: number; total: number | null }>(
+    'SELECT COUNT(*) AS count, SUM(amount_ml) AS total FROM water_entry;',
+  );
+  const days = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM daily_hydration WHERE completed = 1;',
+  );
+  return {
+    totalEntries: entries?.count ?? 0,
+    totalMl: entries?.total ?? 0,
+    successfulDays: days?.count ?? 0,
+  };
+}
+
+/** How many calendar days have at least one drink recorded. */
+export async function countDaysWithEntries(): Promise<number> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM daily_hydration WHERE entry_count > 0;',
+  );
+  return row?.count ?? 0;
+}
+
+/** Every day's completion flag, oldest first — the input to streak maths (11). */
+export async function listDayOutcomes(): Promise<{ date: LocalDate; completed: boolean }[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ date: string; completed: number }>(
+    'SELECT date, completed FROM daily_hydration ORDER BY date ASC;',
+  );
+  return rows.map((row) => ({ date: row.date, completed: row.completed === 1 }));
+}

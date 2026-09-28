@@ -10,7 +10,7 @@
 
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
 import { Mascot } from '@/components/Mascot';
 import { Body, Button, Caption, Notice, Screen, Spacer, Title } from '@/components/ui';
@@ -19,7 +19,7 @@ import { isValidEmail } from '@/services/authService';
 import { color, radius, spacing, typography } from '@/theme';
 
 export default function SignInScreen() {
-  const { signIn, reduceMotion } = useAppState();
+  const { signIn, activeGoal, reduceMotion } = useAppState();
   const [mode, setMode] = useState<'choose' | 'email'>('choose');
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,10 @@ export default function SignInScreen() {
     setError(null);
     try {
       await signIn({ provider, email: address });
-      router.replace('/(onboarding)/goal');
+      // Signing back in with a goal still running: pick up where you left off
+      // instead of being made to replace it.
+      if (activeGoal) router.dismissTo('/(tabs)');
+      else router.replace('/(onboarding)/goal');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'That did not work. Try again?');
     } finally {
@@ -43,12 +46,12 @@ export default function SignInScreen() {
       setError('That email address looks incomplete.');
       return;
     }
-    void proceed('email', email.trim());
+    void proceed('email', email.trim().toLowerCase());
   };
 
   return (
     <Screen scroll contentStyle={styles.content}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View>
         <View style={styles.header}>
           <Mascot state="thinking" size={96} reduceMotion={reduceMotion} />
           <Spacer size={spacing.lg} />
@@ -85,6 +88,7 @@ export default function SignInScreen() {
               }}
               placeholder="you@example.com"
               placeholderTextColor={color.textMuted}
+              selectionColor={color.accent}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
@@ -110,7 +114,7 @@ export default function SignInScreen() {
         <Caption tone="muted" center>
           AQUIS keeps your hydration data on this device. Nothing is uploaded.
         </Caption>
-      </KeyboardAvoidingView>
+      </View>
     </Screen>
   );
 }
@@ -129,10 +133,10 @@ const styles = StyleSheet.create({
   input: {
     ...typography.body,
     color: color.textPrimary,
-    backgroundColor: color.surface,
+    backgroundColor: color.surfaceSunk,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: color.border,
+    borderColor: color.accentSoft,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
     minHeight: 54,

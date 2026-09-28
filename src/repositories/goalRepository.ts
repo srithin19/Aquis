@@ -56,7 +56,8 @@ export async function createGoal(input: GoalPeriodInput): Promise<Goal> {
   const goal = buildGoalPeriod(input, createId('goal'));
 
   await db.withTransactionAsync(async () => {
-    await db.runAsync(`UPDATE goal SET status = 'ended' WHERE status = 'active';`);
+    // A period replaced mid-way is not a finished period: no end-of-goal summary.
+    await db.runAsync(`UPDATE goal SET status = 'ended', summary_seen = 1 WHERE status = 'active';`);
     await db.runAsync(
       `INSERT INTO goal (id, daily_goal_ml, start_date, end_date, duration_days, status, created_at, recommendation_source)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
@@ -92,4 +93,28 @@ export async function getGoalForDate(date: LocalDate): Promise<Goal | null> {
     [date, date],
   );
   return row ? toGoal(row) : null;
+}
+
+/** The most recent goal period that closed on its own and has not been summarised yet. */
+export async function getUnseenClosedGoal(): Promise<Goal | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<GoalRow>(
+    `SELECT * FROM goal WHERE status != 'active' AND summary_seen = 0
+     ORDER BY created_at DESC LIMIT 1;`,
+  );
+  return row ? toGoal(row) : null;
+}
+
+export async function markSummarySeen(goalId: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('UPDATE goal SET summary_seen = 1 WHERE id = ?;', [goalId]);
+}
+
+/** Goal periods where every day reached 100% — the "Goal Crusher" rule (12). */
+export async function countCrushedGoals(): Promise<number> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM goal WHERE status = 'completed';`,
+  );
+  return row?.count ?? 0;
 }

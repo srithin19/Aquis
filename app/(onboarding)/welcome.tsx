@@ -6,37 +6,52 @@
 import { router } from 'expo-router';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { MascotStage } from '@/components/Mascot';
-import { Body, Button, Display, Screen, Spacer } from '@/components/ui';
+import { Body, Button, Display, enterPop, enterUp, Micro, Screen } from '@/components/ui';
 import { useAppState } from '@/state/AppProvider';
-import { spacing } from '@/theme';
+import { palette, spacing } from '@/theme';
 
 export default function WelcomeScreen() {
   const { reduceMotion } = useAppState();
+  const enter = (delay: number) => enterUp(delay, reduceMotion);
 
   return (
     <Screen contentStyle={styles.content}>
-      <View style={styles.hero}>
-        <MascotStage state="happy" size={180} reduceMotion={reduceMotion} />
-      </View>
+      {/* "Large mascot occupying the upper half." */}
+      <Animated.View entering={enterPop(0, reduceMotion)} style={styles.hero}>
+        <MascotStage state="happy" size={200} reduceMotion={reduceMotion} />
+      </Animated.View>
 
       <View style={styles.copy}>
-        <Display center>Hydration, without the nagging.</Display>
-        <Spacer size={spacing.md} />
-        <Body tone="secondary" center>
-          AQUIS watches the day with you and speaks up only when a sip actually makes sense.
-        </Body>
+        <Animated.View entering={enter(120)}>
+          <Micro tone="accent" center>
+            MEET AQUIS
+          </Micro>
+        </Animated.View>
+        <Animated.View entering={enter(200)}>
+          <Display center style={styles.headline}>
+            Hydration,{'\n'}
+            <Display style={styles.highlight}>without the nagging.</Display>
+          </Display>
+        </Animated.View>
+        <Animated.View entering={enter(300)}>
+          <Body tone="secondary" center>
+            A tiny water companion that fills up as you drink and only speaks up when a sip actually
+            makes sense.
+          </Body>
+        </Animated.View>
       </View>
 
-      <View style={styles.actions}>
+      <Animated.View entering={enter(420)} style={styles.actions}>
         <Button label="Get started" onPress={() => router.push('/(onboarding)/sign-in')} />
         <Button
           label="Already have an account? Sign in"
           variant="ghost"
           onPress={() => router.push('/(onboarding)/sign-in')}
         />
-      </View>
+      </Animated.View>
     </Screen>
   );
 }
@@ -45,7 +60,6 @@ const styles = StyleSheet.create({
   content: {
     justifyContent: 'space-between',
   },
-  // "Large mascot occupying the upper half."
   hero: {
     flex: 1,
     alignItems: 'center',
@@ -53,6 +67,13 @@ const styles = StyleSheet.create({
   },
   copy: {
     paddingHorizontal: spacing.sm,
+    gap: spacing.md,
+  },
+  headline: {
+    marginTop: spacing.xs,
+  },
+  highlight: {
+    color: palette.teal300,
   },
   actions: {
     paddingTop: spacing.xxl,

@@ -65,3 +65,48 @@ export function formatTime(ms: number): string {
     minute: '2-digit',
   });
 }
+
+/** 'YYYY-MM' key for a month. */
+export type MonthKey = string;
+
+export function monthOf(date: LocalDate): MonthKey {
+  return date.slice(0, 7);
+}
+
+export function addMonths(month: MonthKey, delta: number): MonthKey {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+}
+
+export function formatMonthLabel(month: MonthKey): string {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+/**
+ * The month as calendar weeks, Monday first. Cells outside the month are
+ * `null` so the grid keeps its shape without inventing days (06.12).
+ */
+export function buildMonthGrid(month: MonthKey): (LocalDate | null)[][] {
+  const [y, m] = month.split('-').map(Number);
+  const first = new Date(y, m - 1, 1);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const leading = (first.getDay() + 6) % 7; // Monday = 0
+
+  const cells: (LocalDate | null)[] = Array.from({ length: leading }, () => null);
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push(`${month}-${pad(day)}`);
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const weeks: (LocalDate | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
+export const WEEKDAY_INITIALS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
+
+export function formatShortDay(date: LocalDate): string {
+  return fromLocalDate(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}

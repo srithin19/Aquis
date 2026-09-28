@@ -8,7 +8,7 @@
 
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 
 import { Mascot } from '@/components/Mascot';
 import {
@@ -36,7 +36,7 @@ import { useOnboarding } from '@/state/OnboardingProvider';
 import { color, radius, spacing, typography } from '@/theme';
 
 export default function DurationScreen() {
-  const { reduceMotion } = useAppState();
+  const { reduceMotion, settings } = useAppState();
   const { dailyGoalMl, durationDays, setDurationDays } = useOnboarding();
   const [customMode, setCustomMode] = useState(false);
   const [customValue, setCustomValue] = useState('');
@@ -46,26 +46,28 @@ export default function DurationScreen() {
   const start = todayLocal();
   const end = addDays(start, durationDays - 1);
 
-  const applyCustom = () => {
+  /** Returns false (and shows why) when the typed length is not usable. */
+  const applyCustom = (): boolean => {
     const parsed = Number(customValue.trim());
     if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
       setError('Enter a whole number of days.');
-      return;
+      return false;
     }
     if (parsed < MIN_DURATION_DAYS || parsed > MAX_DURATION_DAYS) {
       setError(`Goal periods run from ${MIN_DURATION_DAYS} to ${MAX_DURATION_DAYS} days.`);
-      return;
+      return false;
     }
     setError(null);
     setDurationDays(parsed);
     setCustomMode(false);
+    return true;
   };
 
   return (
     <Screen scroll contentStyle={styles.content}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View>
         <View style={styles.header}>
-          <Mascot state="thinking" size={92} reduceMotion={reduceMotion} />
+          <Mascot state="thinking" size={92} reduceMotion={reduceMotion} pokeKey={durationDays} />
           <Spacer size={spacing.lg} />
           <Title center>How long should this run?</Title>
           <Spacer size={spacing.sm} />
@@ -105,6 +107,7 @@ export default function DurationScreen() {
               }}
               placeholder={`Days (${MIN_DURATION_DAYS}–${MAX_DURATION_DAYS})`}
               placeholderTextColor={color.textMuted}
+              selectionColor={color.accent}
               keyboardType="number-pad"
               inputMode="numeric"
               returnKeyType="done"
@@ -145,8 +148,16 @@ export default function DurationScreen() {
         </Card>
 
         <Spacer size={spacing.xl} />
-        <Button label="Continue" onPress={() => router.push('/(onboarding)/notifications')} />
-      </KeyboardAvoidingView>
+        <Button
+          label="Continue"
+          onPress={() => {
+            if (customMode && customValue.trim() && !applyCustom()) return;
+            // Someone who has onboarded already knows the reminder and mascot
+            // screens — a new goal goes straight to confirmation.
+            router.push(settings.onboardingCompleted ? '/(onboarding)/confirm' : '/(onboarding)/notifications');
+          }}
+        />
+      </View>
     </Screen>
   );
 }
@@ -170,10 +181,10 @@ const styles = StyleSheet.create({
   input: {
     ...typography.body,
     color: color.textPrimary,
-    backgroundColor: color.surface,
+    backgroundColor: color.surfaceSunk,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: color.border,
+    borderColor: color.accentSoft,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
     minHeight: 54,

@@ -7,23 +7,26 @@
 
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { MascotStage, type MascotState } from '@/components/Mascot';
-import { Body, Button, Display, Screen, Spacer } from '@/components/ui';
+import { Body, Button, Caption, Display, Screen, Spacer } from '@/components/ui';
 import { useAppState } from '@/state/AppProvider';
 import { spacing } from '@/theme';
+import { play } from '@/services/sound';
+import { haptic } from '@/utils/haptics';
 
 /** The introduction beat, kept short enough not to delay the Continue button. */
 const SEQUENCE: { state: MascotState; hold: number }[] = [
-  { state: 'happy', hold: 1100 },
-  { state: 'thinking', hold: 700 },
+  { state: 'happy', hold: 1600 },
+  { state: 'excited', hold: 1300 },
   { state: 'idle', hold: 0 },
 ];
 
 export default function MascotIntroScreen() {
   const { reduceMotion } = useAppState();
   const [step, setStep] = useState(0);
+  const [pokes, setPokes] = useState(0);
 
   useEffect(() => {
     // Reduce Motion: settle on the resting pose immediately (08).
@@ -39,7 +42,20 @@ export default function MascotIntroScreen() {
   return (
     <Screen contentStyle={styles.content}>
       <View style={styles.hero}>
-        <MascotStage state={SEQUENCE[step].state} size={200} reduceMotion={reduceMotion} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Say hi to your droplet"
+          onPress={() => {
+            haptic('light');
+            play('pop');
+            setPokes((n) => n + 1);
+          }}
+        >
+          <MascotStage state={SEQUENCE[step].state} size={200} reduceMotion={reduceMotion} pokeKey={pokes} />
+        </Pressable>
+        <Caption tone="muted" center style={styles.hint}>
+          Go on, give it a tap.
+        </Caption>
       </View>
 
       <View>
@@ -64,5 +80,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  hint: {
+    marginTop: spacing.lg,
   },
 });
