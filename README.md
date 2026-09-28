@@ -28,7 +28,7 @@ Other scripts:
 | Command | What it does |
 | --- | --- |
 | `npm run android` / `npm run ios` | Start with a platform preselected |
-| `npm test` | 66 Jest tests: every screen and button, end-to-end data flows on a real SQLite (sql.js), sounds, and one regression test per audited bug |
+| `npm test` | 71 Jest tests: every screen and button, end-to-end data flows on a real SQLite (sql.js), sounds, Google sign-in, and one regression test per audited bug |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run sounds` | Re-synthesise the sound effects in `assets/sounds/` |
 | `npm run check:domain` | 39 domain checks: hydration maths, goal periods, local dates, streaks, badges, reminder planning, calendar grid |
@@ -128,6 +128,38 @@ Other scripts:
   rollover while the app stays open, and a local-only analytics event taxonomy (section 14) that
   never leaves the device.
 
+## Google sign-in
+
+"Continue with Google" uses the native Google Sign-In SDK, which must be compiled into the app —
+it cannot run in Expo Go. Until the steps below are done, the button says why and offers email.
+
+1. **Google Cloud** — at [console.cloud.google.com](https://console.cloud.google.com): create a
+   project, configure the OAuth consent screen (External, app name AQUIS), then under
+   *Credentials → Create credentials → OAuth client ID* create:
+   - a **Web application** client → its ID is `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`
+   - an **iOS** client with bundle ID `com.aquis.app` → `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`
+   - an **Android** client with package `com.aquis.app` and your signing key's SHA-1 (step 4)
+2. **Local config** — `cp .env.example .env` and paste the two IDs. `app.config.js` adds the Google
+   plugin (and the iOS URL scheme derived from the iOS ID) only when they are set.
+3. **Build** (needs a free [Expo account](https://expo.dev)):
+   ```bash
+   npm install -g eas-cli
+   eas login
+   eas init                      # links this project to your account
+   eas env:create --environment development --visibility plaintext \
+     --name EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID --value <web client id>
+   eas env:create --environment development --visibility plaintext \
+     --name EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID --value <ios client id>
+   eas build --profile development --platform android
+   ```
+   Install the APK it gives you, then run `npx expo start --dev-client` and open AQUIS (not Expo
+   Go). This build also plays the custom AQUIS notification sound. iPhone builds need an Apple
+   Developer account.
+4. **Android SHA-1** — `eas credentials -p android` shows the SHA-1 of the key EAS signs with; add it
+   to the Android OAuth client from step 1, or Google will reject the sign-in.
+
+`eas.json` also has `preview` (installable APK) and `production` profiles.
+
 ## Screens
 
 | Route | Product Bible |
@@ -171,7 +203,7 @@ to tomorrow. `npm run check:domain` covers this along with DST and month boundar
 | Area | Note |
 | --- | --- |
 | Active-call / >1 h screen-use suppression | Not exposed to Expo apps. Per the spec's platform-limitation note, these fall back to time-based rules; the one live signal used is "AQUIS is open right now". |
-| Auth | "Continue with Google" and email create a **local** profile — no Google account is contacted and no email is verified. Real Google sign-in needs OAuth client IDs from Google Cloud and a development build (Expo Go can't host it); `authService` is the one place to plug it in. |
+| Auth | Google sign-in is real (native Google Sign-In SDK) but needs a development/store build and your OAuth client IDs — see [Google sign-in](#google-sign-in). In Expo Go the button explains this and offers email. Email sign-in stores the address on the phone only; with no backend in V1 there is no password or verification. |
 | Custom notification sound | Needs a real build; Expo Go plays the system sound instead. |
 | Mascot | Skia rather than Rive: Rive needs a development build, and this runs in Expo Go. The state vocabulary is identical, so a Rive swap is a component-level change. |
 | Social (V2) | Friends and challenges are out of MVP scope and are only teased on Achievements. |

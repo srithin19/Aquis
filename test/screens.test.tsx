@@ -51,7 +51,7 @@ beforeEach(async () => {
 /** Sign in + a 2 L / 7 day goal, as onboarding would leave it. */
 async function onboarded(r: Rendered, goal = { dailyGoalMl: 2000, durationDays: 7 }) {
   await act(async () => {
-    await r.state().signIn({ provider: 'google' });
+    await r.state().signIn({ provider: 'email', email: 'tester@example.com' });
   });
   await act(async () => {
     await r.state().updateSettings({ notificationsEnabled: true, onboardingCompleted: true });
@@ -89,12 +89,13 @@ describe('Welcome', () => {
 });
 
 describe('Sign in', () => {
-  test('Continue with Google creates a profile and moves to goal setup', async () => {
+  test('Continue with Google explains itself when Google isn’t set up, and offers email', async () => {
     const r = await renderScreen(<SignIn />);
-    await fireEvent.press(r.screen.getByText('Continue with Google'));
-    await settle();
-    expect(r.state().profile?.provider).toBe('google');
-    expect(nav.replace).toHaveBeenCalledWith('/(onboarding)/goal');
+    chooseAlert('Use email');
+    await fireEvent.press(r.screen.getByLabelText('Continue with Google'));
+    expect(alerts()[0].title).toBe('Google sign-in isn’t available here');
+    expect(r.state().profile).toBeNull(); // never a fake sign-in
+    expect(r.screen.getByLabelText('Email address')).toBeTruthy();
   });
 
   test('email: rejects a bad address, accepts a good one, Back returns', async () => {
@@ -197,7 +198,7 @@ describe('Goal confirmation', () => {
   test('Start my goal saves the goal and the preference, then opens Home', async () => {
     const r = await renderScreen(<Confirm />);
     await act(async () => {
-      await r.state().signIn({ provider: 'google' });
+      await r.state().signIn({ provider: 'email', email: 'tester@example.com' });
     });
     await fireEvent.press(r.screen.getByText('Start my goal'));
     await settle();

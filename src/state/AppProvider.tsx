@@ -48,7 +48,7 @@ import { clearProfile } from '@/repositories/profileRepository';
 import { getSettings, updateSettings as persistSettings } from '@/repositories/settingsRepository';
 import { saveStreak } from '@/repositories/streakRepository';
 import { track } from '@/services/analytics';
-import { getAuthProvider, type SignInRequest } from '@/services/authService';
+import { getAuthProvider, type SignInOutcome, type SignInRequest } from '@/services/authService';
 import {
   cancelAllReminders,
   getPermission,
@@ -130,7 +130,8 @@ interface AppStateValue {
   /** Bumped on every data change so screens reading the database can refetch. */
   revision: number;
 
-  signIn(request: SignInRequest): Promise<UserProfile>;
+  /** Google or email. Resolves to what happened — signed in, cancelled, or why not. */
+  signIn(request: SignInRequest): Promise<SignInOutcome>;
   signOut(): Promise<void>;
   startGoal(input: { dailyGoalMl: number; durationDays: number }): Promise<Goal>;
   logWater(amountMl: number, source: WaterEntrySource): Promise<LogWaterOutcome>;
@@ -419,17 +420,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (request: SignInRequest) => {
-    const next = await getAuthProvider().signIn(request);
+    const outcome = await getAuthProvider().signIn(request);
+    if (outcome.status !== 'signed-in') return outcome;
     setRemindersActive(true);
-    setProfile(next);
+    setProfile(outcome.profile);
     // Signing back in with a goal still running: bring its reminders back.
     if (latest.current.activeGoal) void load();
-    return next;
+    return outcome;
   }, [load]);
 
   const signOut = useCallback(async () => {
     await cancelAllReminders();
     setNextReminderAt(null);
+    await getAuthProvider().signOut();
     await clearProfile();
     setProfile(null);
   }, []);

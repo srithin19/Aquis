@@ -78,6 +78,45 @@ jest.mock('@/services/notificationArt', () => ({
   writeDropletAttachment: () => null,
 }));
 
+/* --------------------------------------------------------- google sign-in */
+
+// Tests run as a real build (not Expo Go) unless a test says otherwise.
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { executionEnvironment: 'bare', expoConfig: {} },
+  ExecutionEnvironment: { Bare: 'bare', Standalone: 'standalone', StoreClient: 'storeClient' },
+}));
+
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(async () => true),
+    signIn: jest.fn(async () => ({
+      type: 'success',
+      data: {
+        user: {
+          id: 'google-123',
+          email: 'Sri.C@Gmail.com',
+          name: 'Sri C',
+          givenName: 'Sri',
+          familyName: 'C',
+          photo: 'https://example.com/sri.png',
+        },
+        idToken: 'token',
+        scopes: [],
+        serverAuthCode: null,
+      },
+    })),
+    signOut: jest.fn(async () => null),
+  },
+  statusCodes: {
+    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+    IN_PROGRESS: 'IN_PROGRESS',
+    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+    SIGN_IN_REQUIRED: 'SIGN_IN_REQUIRED',
+  },
+}));
+
 /* ------------------------------------------------------------ device bits */
 
 jest.mock('expo-haptics', () => ({

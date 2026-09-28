@@ -29,7 +29,7 @@ beforeEach(async () => {
 
 async function onboarded(r: Rendered, dailyGoalMl = 2000) {
   await act(async () => {
-    await r.state().signIn({ provider: 'google' });
+    await r.state().signIn({ provider: 'email', email: 'tester@example.com' });
   });
   await act(async () => {
     await r.state().updateSettings({ notificationsEnabled: true, onboardingCompleted: true });

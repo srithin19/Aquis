@@ -1,21 +1,24 @@
 /**
  * Authentication — Product Bible 06.3.
  *
- * Google and email both route through `authService`. V1 runs the local adapter
- * (see that file): the screens, the profile record and the navigation are real,
- * the credential check is the piece a provider fills in later.
+ * Google uses the real Google Sign-In SDK (a development/store build with the
+ * OAuth client IDs set). Where that isn't possible — Expo Go, or IDs missing —
+ * the button says so plainly and offers email instead; it never fakes a
+ * Google sign-in. Email records a local profile (no backend in V1).
  *
  * "Do not force profile completion before the hydration goal can be configured."
  */
 
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, TextInput, View } from 'react-native';
 
+import { GoogleButton } from '@/components/GoogleButton';
 import { Mascot } from '@/components/Mascot';
 import { Body, Button, Caption, Notice, Screen, Spacer, Title } from '@/components/ui';
 import { useAppState } from '@/state/AppProvider';
 import { isValidEmail } from '@/services/authService';
+import { availabilityMessage, googleAvailability } from '@/services/googleAuth';
 import { color, radius, spacing, typography } from '@/theme';
 
 export default function SignInScreen() {
@@ -25,11 +28,19 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const [busyProvider, setBusyProvider] = useState<'google' | 'email' | null>(null);
+
   const proceed = async (provider: 'google' | 'email', address?: string) => {
     setBusy(true);
+    setBusyProvider(provider);
     setError(null);
     try {
-      await signIn({ provider, email: address });
+      const outcome = await signIn({ provider, email: address });
+      if (outcome.status === 'cancelled') return; // closed the Google sheet — stay here
+      if (outcome.status !== 'signed-in') {
+        setError(outcome.message);
+        return;
+      }
       // Signing back in with a goal still running: pick up where you left off
       // instead of being made to replace it.
       if (activeGoal) router.dismissTo('/(tabs)');
@@ -38,7 +49,20 @@ export default function SignInScreen() {
       setError(cause instanceof Error ? cause.message : 'That did not work. Try again?');
     } finally {
       setBusy(false);
+      setBusyProvider(null);
     }
+  };
+
+  const continueWithGoogle = () => {
+    const availability = googleAvailability();
+    if (availability !== 'ready') {
+      Alert.alert('Google sign-in isn’t available here', availabilityMessage(availability), [
+        { text: 'OK', style: 'cancel' },
+        { text: 'Use email', onPress: () => setMode('email') },
+      ]);
+      return;
+    }
+    void proceed('google');
   };
 
   const submitEmail = () => {
@@ -66,11 +90,7 @@ export default function SignInScreen() {
 
         {mode === 'choose' ? (
           <View style={styles.actions}>
-            <Button
-              label="Continue with Google"
-              disabled={busy}
-              onPress={() => void proceed('google')}
-            />
+            <GoogleButton busy={busyProvider === 'google'} disabled={busy} onPress={continueWithGoogle} />
             <Button
               label="Continue with email"
               variant="secondary"
@@ -112,7 +132,9 @@ export default function SignInScreen() {
 
         <Spacer size={spacing.xl} />
         <Caption tone="muted" center>
-          AQUIS keeps your hydration data on this device. Nothing is uploaded.
+          {mode === 'email'
+            ? 'Your email is saved on this phone only — nothing is sent, so there’s no password or code.'
+            : 'AQUIS keeps your hydration data on this device. Nothing is uploaded.'}
         </Caption>
       </View>
     </Screen>

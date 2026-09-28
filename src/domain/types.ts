@@ -17,6 +17,9 @@ export interface UserProfile {
   email: string | null;
   provider: AuthProvider;
   createdAt: Millis;
+  /** The provider's own account id (Google's user id); null for email. */
+  providerRef: string | null;
+  photoUrl: string | null;
 }
 
 export type AuthProvider = 'local' | 'google' | 'email';

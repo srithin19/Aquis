@@ -109,7 +109,7 @@ export async function onboard(
   goal = { dailyGoalMl: 2000, durationDays: 7 },
 ) {
   await act(async () => {
-    await app.current.signIn({ provider: 'google' });
+    await app.current.signIn({ provider: 'email', email: 'tester@example.com' });
   });
   await act(async () => {
     await app.current.updateSettings({ notificationsEnabled: true, onboardingCompleted: true });

@@ -7,7 +7,7 @@
 
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/Icon';
@@ -183,15 +183,20 @@ export default function ProfileScreen() {
 
         {/* Account */}
         <Card style={styles.account}>
-          <View style={[styles.avatar, { backgroundColor: gradient.primary[0] }]}>
-            <Title tone="onAccent" style={styles.avatarText}>
-              {initials}
-            </Title>
-          </View>
+          {profile?.photoUrl ? (
+            <Image source={{ uri: profile.photoUrl }} style={styles.avatar} accessibilityLabel="Your Google photo" />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: gradient.primary[0] }]}>
+              <Title tone="onAccent" style={styles.avatarText}>
+                {initials}
+              </Title>
+            </View>
+          )}
           <View style={styles.flex}>
             <BodyStrong>{profile?.displayName ?? 'AQUIS member'}</BodyStrong>
-            <Caption tone="muted">
-              {profile?.email ?? `Signed in with ${profile?.provider ?? 'this device'}`}
+            {profile?.email ? <Caption tone="muted">{profile.email}</Caption> : null}
+            <Caption tone="faint">
+              {profile?.provider === 'google' ? 'Signed in with Google' : 'Saved on this phone'}
             </Caption>
           </View>
         </Card>

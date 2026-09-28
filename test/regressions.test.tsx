@@ -35,7 +35,7 @@ beforeEach(async () => {
 
 async function onboarded(r: Rendered, goal = { dailyGoalMl: 2000, durationDays: 7 }, notifications = true) {
   await act(async () => {
-    await r.state().signIn({ provider: 'google' });
+    await r.state().signIn({ provider: 'email', email: 'tester@example.com' });
   });
   await act(async () => {
     await r.state().updateSettings({ notificationsEnabled: notifications, onboardingCompleted: true });
@@ -51,7 +51,10 @@ test('#1 signing out and back in returns to Home and keeps the running goal', as
   await act(async () => {
     await r.state().signOut();
   });
-  await fireEvent.press(r.screen.getByText('Continue with Google'));
+  await fireEvent.press(r.screen.getByText('Continue with email'));
+  await fireEvent.changeText(r.screen.getByLabelText('Email address'), 'tester@example.com');
+  waitPastDoubleTap();
+  await fireEvent.press(r.screen.getByText('Continue'));
   await settle();
   expect(nav.dismissTo).toHaveBeenCalledWith('/(tabs)');
   expect(nav.replace).not.toHaveBeenCalledWith('/(onboarding)/goal');
@@ -176,7 +179,7 @@ test('#10 the goal-complete card is honest about post-goal reminders', async () 
 test('#19 with no goal running, logging is disabled rather than counted against 0', async () => {
   const r = await renderScreen(<Home />);
   await act(async () => {
-    await r.state().signIn({ provider: 'google' });
+    await r.state().signIn({ provider: 'email', email: 'tester@example.com' });
   });
   await settle();
   expect(r.screen.getByText('No active goal')).toBeTruthy();

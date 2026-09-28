@@ -125,6 +125,14 @@ export const MIGRATIONS: readonly Migration[] = [
     id: 3,
     statements: [`ALTER TABLE app_settings ADD COLUMN sounds_enabled INTEGER NOT NULL DEFAULT 1;`],
   },
+  {
+    // Real Google sign-in: the Google account id ("provider reference", 13) and photo.
+    id: 4,
+    statements: [
+      `ALTER TABLE user_profile ADD COLUMN provider_ref TEXT;`,
+      `ALTER TABLE user_profile ADD COLUMN photo_url TEXT;`,
+    ],
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].id;
