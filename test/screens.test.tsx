@@ -424,42 +424,6 @@ describe('Profile', () => {
     expect(r.state().settings.quickAddMl).toEqual([150, 250, 500]);
   });
 
-  test('Send a test nudge schedules a real-looking reminder in 5 seconds', async () => {
-    const r = await renderScreen(<Profile />);
-    await onboarded(r);
-    await act(async () => {
-      await r.state().logWater(500, 'quick_add');
-    });
-    await settle();
-    await fireEvent.press(r.screen.getByText('Send a test nudge'));
-    await settle();
-    const test = scheduled().find((n) => n.content.data.test);
-    expect(test).toBeTruthy();
-    expect(test!.trigger.seconds).toBe(5);
-    expect(test!.content.body).toBe('500 ml of 2.0 L (25%) · 1.5 L to go');
-    expect(r.screen.getByText(/Arriving in 5 s/)).toBeTruthy();
-  });
-
-  test('test nudge with notifications blocked explains how to fix it', async () => {
-    const r = await renderScreen(<Profile />);
-    await onboarded(r);
-    setPermission(false, false);
-    chooseAlert('Not now');
-    await fireEvent.press(r.screen.getByText('Send a test nudge'));
-    await settle();
-    expect(alerts().map((a) => a.title)).toContain('Notifications are off for AQUIS');
-  });
-
-  test('Coming up lists the planned nudges', async () => {
-    const r = await renderScreen(<Profile />);
-    await onboarded(r);
-    await act(async () => {
-      await r.state().refresh();
-    });
-    await settle();
-    expect(r.screen.getAllByText(/around/).length).toBeGreaterThan(0);
-  });
-
   test('Start a new goal opens goal setup', async () => {
     const r = await renderScreen(<Profile />);
     await onboarded(r);

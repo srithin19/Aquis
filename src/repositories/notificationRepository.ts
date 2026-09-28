@@ -54,17 +54,6 @@ export async function markAction(id: string, action: NotificationAction, at = Da
   );
 }
 
-/** The planned reminders still ahead, soonest first (Profile → "Coming up"). */
-export async function listUpcoming(now = Date.now(), limit = 6): Promise<{ id: string; at: number; reason: string }[]> {
-  const db = await getDatabase();
-  const rows = await db.getAllAsync<{ id: string; scheduled_at: number; reason: string | null }>(
-    `SELECT id, scheduled_at, reason FROM notification_event
-      WHERE scheduled_at > ? AND action IS NULL ORDER BY scheduled_at ASC LIMIT ?;`,
-    [now, limit],
-  );
-  return rows.map((row) => ({ id: row.id, at: row.scheduled_at, reason: row.reason ?? '' }));
-}
-
 /** Drops every future plan row — used when reminders are switched off. */
 export async function clearPlanned(now = Date.now()): Promise<void> {
   const db = await getDatabase();

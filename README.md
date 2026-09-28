@@ -28,7 +28,7 @@ Other scripts:
 | Command | What it does |
 | --- | --- |
 | `npm run android` / `npm run ios` | Start with a platform preselected |
-| `npm test` | 71 Jest tests: every screen and button, end-to-end data flows on a real SQLite (sql.js), sounds, Google sign-in, and one regression test per audited bug |
+| `npm test` | 68 Jest tests: every screen and button, end-to-end data flows on a real SQLite (sql.js), sounds, Google sign-in, and one regression test per audited bug |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run sounds` | Re-synthesise the sound effects in `assets/sounds/` |
 | `npm run check:domain` | 39 domain checks: hydration maths, goal periods, local dates, streaks, badges, reminder planning, calendar grid |

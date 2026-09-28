@@ -13,12 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useTabBarInset } from '@/components/layout';
 import { Body, BodyStrong, Caption, Card, Chip, Divider, SectionLabel, Title } from '@/components/ui';
-import { formatDayLabel, formatTime, toLocalDate } from '@/domain/date';
+import { formatDayLabel } from '@/domain/date';
 import { daysRemaining, describeDuration, goalDayNumber } from '@/domain/goals';
 import { DEFAULT_QUICK_ADD_ML, formatVolume } from '@/domain/hydration';
 import { countDaysWithEntries } from '@/repositories/hydrationRepository';
-import { listUpcoming } from '@/repositories/notificationRepository';
-import { sendTestReminder, TEST_DELAY_S } from '@/services/notificationService';
 import { play, setSoundsEnabled } from '@/services/sound';
 import { formatClock, parseClock } from '@/domain/notifications';
 import { useAppState } from '@/state/AppProvider';
@@ -40,11 +38,8 @@ export default function ProfileScreen() {
     today,
     notificationPermission,
     systemReduceMotion,
-    consumedMl,
-    goalMl,
     stats,
     revision,
-    nextReminderAt,
     updateSettings,
     setRemindersEnabled,
     resetLocalData,
@@ -52,53 +47,22 @@ export default function ProfileScreen() {
   } = useAppState();
   const bottomInset = useTabBarInset();
   const [busy, setBusy] = useState(false);
-  const [upcoming, setUpcoming] = useState<{ id: string; at: number }[]>([]);
   const [daysRecorded, setDaysRecorded] = useState(0);
-  const [testSent, setTestSent] = useState(false);
 
-  // Refresh the plan list and day count whenever the data or the plan changes.
+  // Refresh the day count whenever the data changes.
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      void Promise.all([listUpcoming(), countDaysWithEntries()]).then(([rows, days]) => {
-        if (!active) return;
-        setUpcoming(rows);
-        setDaysRecorded(days);
-      });
+      void countDaysWithEntries()
+        .then((days) => {
+          if (active) setDaysRecorded(days);
+        })
+        .catch(() => {});
       return () => {
         active = false;
       };
-    }, [revision, nextReminderAt, settings.notificationsEnabled]),
+    }, [revision]),
   );
-
-  const testTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (testTimer.current) clearTimeout(testTimer.current);
-  }, []);
-
-  const sendTest = async () => {
-    if (testSent) return;
-    let permission;
-    try {
-      permission = await sendTestReminder({ consumedMl, goalMl, sound: settings.soundsEnabled });
-    } catch {
-      Alert.alert('Could not send a test', 'Scheduling the test notification failed. Please try again.');
-      return;
-    }
-    if (permission === 'granted') {
-      setTestSent(true);
-      testTimer.current = setTimeout(() => setTestSent(false), (TEST_DELAY_S + 3) * 1000);
-      return;
-    }
-    Alert.alert(
-      'Notifications are off for AQUIS',
-      'Allow notifications for AQUIS (in Expo Go, for Expo Go) in your phone’s settings, then try again.',
-      [
-        { text: 'Not now', style: 'cancel' },
-        { text: 'Open settings', onPress: () => void Linking.openSettings() },
-      ],
-    );
-  };
 
   const confirmReset = () => {
     Alert.alert(
@@ -278,52 +242,6 @@ export default function ProfileScreen() {
               onPlus={() => shiftQuiet('quietEnd', QUIET_STEP_MIN)}
             />
           </View>
-        </Card>
-
-        {/* See a reminder without waiting for one. */}
-        <SectionLabel style={styles.section}>Try it</SectionLabel>
-        <Card>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void sendTest()}
-            style={({ pressed }) => [styles.testButton, pressed && styles.pressed]}
-          >
-            <Icon name="bell" size={18} color={palette.ink950} strokeWidth={2.3} />
-            <BodyStrong style={styles.testLabel}>
-              {testSent ? `Arriving in ${TEST_DELAY_S} s — lock your phone!` : 'Send a test nudge'}
-            </BodyStrong>
-          </Pressable>
-          <Caption tone="muted" style={styles.note}>
-            Fires in {TEST_DELAY_S} seconds with today’s amount — exactly what a real nudge looks like. Lock
-            the phone or switch apps to see it as a banner. On iPhone, long-press it to see your droplet.
-            Its “Log 250 ml” button really logs a drink, just like a real nudge.
-          </Caption>
-          <Divider />
-          <Body>Coming up</Body>
-          {!settings.notificationsEnabled ? (
-            <Caption tone="muted">Reminders are off.</Caption>
-          ) : upcoming.length === 0 ? (
-            <Caption tone="muted">
-              {notificationPermission === 'granted'
-                ? 'Nothing planned right now (goal done, or quiet hours).'
-                : 'Allow notifications to plan nudges.'}
-            </Caption>
-          ) : (
-            upcoming.map((item) => {
-              const day = toLocalDate(new Date(item.at)) === toLocalDate() ? 'Today' : 'Tomorrow';
-              return (
-                <View key={item.id} style={styles.upcomingRow}>
-                  <View style={styles.upcomingDot} />
-                  <Caption tone="secondary">
-                    {day} · around {formatTime(item.at)}
-                  </Caption>
-                </View>
-              );
-            })
-          )}
-          <Caption tone="faint" style={styles.note}>
-            Times are picked at random inside each ~3-hour window and re-planned after every drink.
-          </Caption>
         </Card>
 
         {/* Default quick-add values (06.15) */}
@@ -623,32 +541,6 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  testButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: palette.lime400,
-    borderRadius: radius.pill,
-    borderBottomWidth: 3,
-    borderBottomColor: palette.lime700,
-    paddingVertical: spacing.md,
-  },
-  testLabel: {
-    color: palette.ink950,
-  },
-  upcomingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  upcomingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: palette.teal400,
   },
   dataRow: {
     flexDirection: 'row',

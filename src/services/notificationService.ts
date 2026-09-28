@@ -63,9 +63,8 @@ export function configureNotifications(): void {
       void notificationRepository.markShown(id).catch(() => {});
       // The one live "user is busy on the phone" signal Expo exposes: they are
       // looking at AQUIS right now. Stay silent — the glass is on screen (10).
-      // A test nudge from Profile is the exception: it exists to be seen.
-      const data = notification.request.content.data as { test?: boolean; sound?: boolean } | undefined;
-      const quiet = AppState.currentState === 'active' && !data?.test;
+      const data = notification.request.content.data as { sound?: boolean } | undefined;
+      const quiet = AppState.currentState === 'active';
       return {
         shouldShowBanner: !quiet,
         shouldShowList: !quiet,
@@ -207,46 +206,6 @@ async function doSync(input: SyncInput): Promise<number[]> {
 
   await notificationRepository.replacePlanned(plan, now);
   return plan.map((item) => item.at);
-}
-
-/** Seconds until a test nudge fires — long enough to lock the phone. */
-export const TEST_DELAY_S = 5;
-
-/**
- * Profile → "Send a test nudge": the exact notification a real reminder would
- * be (title, today's amount, droplet art on iOS, the Log 250 ml action), fired
- * in a few seconds so it can be seen without waiting for the next window. It
- * is not part of the plan and does not count toward the daily cap.
- */
-export async function sendTestReminder(input: {
-  consumedMl: number;
-  goalMl: number;
-  sound: boolean;
-}): Promise<PermissionState> {
-  const permission = await requestPermission();
-  if (permission !== 'granted') return permission;
-
-  const id = createId('ntftest');
-  const fill = input.goalMl > 0 ? Math.min(input.consumedMl / input.goalMl, 1) : 0;
-  const art = Platform.OS === 'ios' ? writeDropletAttachment(fill, id) : null;
-  await Notifications.scheduleNotificationAsync({
-    identifier: id,
-    content: {
-      title: titleFor(Date.now(), 0),
-      body: reminderBody({ forToday: true, consumedMl: input.consumedMl, goalMl: input.goalMl }),
-      categoryIdentifier: CATEGORY_ID,
-      data: { kind: 'hydration', url: '/', test: true, sound: input.sound },
-      sound: soundFields(input.sound).sound,
-      color: '#B2F966',
-      ...(art ? { attachments: [{ identifier: 'droplet', url: art, type: null, typeHint: 'public.png' }] } : {}),
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: TEST_DELAY_S,
-      channelId: soundFields(input.sound).channelId,
-    },
-  });
-  return permission;
 }
 
 export function cancelAllReminders(): Promise<void> {
